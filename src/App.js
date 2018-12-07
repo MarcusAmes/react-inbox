@@ -70,7 +70,7 @@ class App extends Component {
     return (
       <div className="App">
         <ToolBar onCompose={this.onCompose} isCompose={this.state.isCompose} messages={this.state.messages} onReadButton={this.onReadButton}/>
-        {this.state.isCompose && <ComposeMessage addMessage={this.addMessage}/>}
+        {this.state.isCompose && <ComposeMessage onCompose={this.onCompose} addMessage={this.addMessage}/>}
         <Messages onMessageChange={this.onMessageChange} messages={this.state.messages}/>
       </div>
     );
