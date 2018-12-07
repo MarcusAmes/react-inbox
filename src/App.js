@@ -22,54 +22,148 @@ class App extends Component {
     this.setState({messages: messages})
   }
 
+  getCheckedIds = () => {
+    const checkedMessages = this.state.messages.filter((message) => message.checked);
+    const checkedIds = checkedMessages.map((item) => item.id)
+    return checkedIds
+  }
+
   onMessageChange = (key, id) => {
-    this.setState(({messages}) => {
-      const newMessages = messages.map((message, idx) => {
-        if (message.id === id) {
-          message[key] = !message[key]
-        }
-        return message
+    if(key === 'starred'){
+      const worked = this.onPatch([id], 'star')
+      if(worked) {
+        this.setState(({messages}) => {
+          const newMessages = messages.map((message, idx) => {
+            if (message.id === id) {
+              message[key] = !message[key]
+            }
+            return message
+          })
+          return {newMessages}
+        })
+      }
+    } else {
+      this.setState(({messages}) => {
+        const newMessages = messages.map((message, idx) => {
+          if (message.id === id) {
+            message[key] = !message[key]
+          }
+          return message
+        })
+        return {newMessages}
       })
-      return {newMessages}
-    })
+    }
+
   }
 
   onReadButton = (str) => {
     const bool = str === 'read';
-    this.setState(({messages}) => {
-      const newMessages = messages.map((message, idx) => {
-        if (message.checked) {
-          message.read = bool
-        }
-        return message
+    const worked = this.onPatch(this.getCheckedIds(), 'read', bool)
+
+    if(worked) {
+      this.setState(({messages}) => {
+        const newMessages = messages.map((message, idx) => {
+          if (message.checked) {
+            message.read = bool
+          }
+          return message
+        })
+        return {newMessages}
       })
-      return {newMessages}
-    })
+    }
   }
 
   onCompose = () => {
     this.setState({isCompose: !this.state.isCompose})
   }
 
-  addMessage = ({subject, body}) => {
+  onMarkBulk = (isAllSelected) => {
     this.setState(({messages}) => {
-      let obj = {
-        body,
-        subject,
-        checked: false,
-        read: false,
-        starred: false,
-        id: messages[messages.length - 1].id + 1,
-        labels: []
+      return { messages: messages.map((message) => {
+          message.checked = !isAllSelected;
+          return message
+        })
       }
-      return {messages: [...messages, obj]}
     })
+  }
+
+  addMessage = (data) => {
+    fetch('http://localhost:8082/api/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers:{
+        'Content-Type': 'application/json'
+      }
+    }).then(res => res.json())
+    .then(response => this.setState(({messages}) => {
+      response.checked = false;
+      return {messages: [...messages, response]}
+    }))
+    .catch(error => console.error('Error:', error));
+    this.setState({isCompose: false})
+  }
+
+  onPatch = (ids, command, read, label) => {
+    const data = {messageIds: ids, command: command, read: read, label: label}
+    return fetch('http://localhost:8082/api/messages', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+      headers:{
+        'Content-Type': 'application/json'
+      }
+    }).then(res => res.ok)
+  }
+
+  onDeleteClick = () => {
+    const worked = this.onPatch(this.getCheckedIds(), 'delete')
+
+    if (worked) {
+      this.setState(({messages}) => {
+        return { messages: messages.filter((message) => !message.checked)
+        }
+      })
+    }
+  }
+
+  onLabelAdd = (val) => {
+    const worked = this.onPatch(this.getCheckedIds(), 'addLabel', null, val)
+
+    if(worked) {
+      this.setState(({messages}) => {
+        const newMessages = messages.map((message, idx) => {
+          if (message.checked) {
+            if (!message.labels.includes(val)){
+              message.labels.push(val)
+            }
+          }
+          return message
+        })
+        return {newMessages}
+      })
+    }
+  }
+
+  onLabelRemove = (val) => {
+    const worked = this.onPatch(this.getCheckedIds(), 'removeLabel', null, val)
+    if(worked) {
+      this.setState(({messages}) => {
+        const newMessages = messages.map((message, idx) => {
+          if (message.checked) {
+            if (message.labels.includes(val)){
+              message.labels = message.labels.filter(label => label !== val)
+            }
+          }
+          return message
+        })
+        return {newMessages}
+      })
+    }
   }
 
   render() {
     return (
       <div className="App">
-        <ToolBar onCompose={this.onCompose} isCompose={this.state.isCompose} messages={this.state.messages} onReadButton={this.onReadButton}/>
+        <ToolBar onLabelAdd={this.onLabelAdd} onLabelRemove={this.onLabelRemove} onDeleteClick={this.onDeleteClick} onMarkBulk={this.onMarkBulk} onCompose={this.onCompose} isCompose={this.state.isCompose} messages={this.state.messages} onReadButton={this.onReadButton}/>
         {this.state.isCompose && <ComposeMessage onCompose={this.onCompose} addMessage={this.addMessage}/>}
         <Messages onMessageChange={this.onMessageChange} messages={this.state.messages}/>
       </div>
